@@ -2,6 +2,7 @@
 
 == Introduction
 *The Oracle JDBC Forward Driver* is designed to preserve existing applications written against the Oracle database through changes to the database, including migrations from the Oracle database to other databases. *Oracle JDBC Forward Driver* operates in three modes
+
 1. *probe* mode - in this mode, all SQL statements sent to the Oracle server are written to a https://yaml.org/[YAML] file
 2. *proxy* mode - in this mode, the driver changes the text of the SQL statements before sending it to Oracle Database if mapping file contains replacement for that statement
 3. *forward* mode - in this mode, the driver redirects SQL statements to another database and modifies the text of the SQL statements before sending it to the database if the mapping file contains a replacement for that statement.
@@ -36,6 +37,7 @@ crp0gbhctd771: {call dbms_application_info.set_client_info('Swingbench Load Gene
    CUSTOMERS WHERE CUSTOMER_ID = ? AND ROWNUM < 5
 ----
 To set this mode:
+
 * mandatory parameter *a2.driver.mode* must have the value *probe*
 * optional parameter *a2.probe.file*  must be set to the name of the file that can be written to. If this parameter is not specified, then writing will be done to the file */tmp/probe.yaml*
 
@@ -57,6 +59,7 @@ This mode is designed to keep the current application untouched if
 2. The data itself has been migrated to another system and you are using https://support.oracle.com/rs?type=doc&id=232482.1[free] https://docs.oracle.com/en/database/oracle/oracle-database/19/odbcu/index.html#Oracle%C2%AE-Database-Gateway-for-ODBC[Oracle TG4ODBC] - for more information about this architecture please see https://docs.google.com/presentation/d/e/2PACX-1vR96Sg9nsAroDjW4LoBZCb5xALsprY8RxhneNNhXG0jqTAaKT5R333uTcd0bPmGuVmqIe5I_L0b0tKD/pub?start=true&loop=true&delayms=3000[Yet another migration approach to mitigate risk and keep current applications intact]
 
 To set this mode:
+
 * mandatory parameter *a2.driver.mode* must have the value *proxy*
 * optional parameter *a2.mapping.file.type*  must be set to either *yaml* or *cmap* to read key-value store from either https://yaml.org/[YAML] file or https://chronicle.software/map/[Chronicle Map] respectively. If this parameter is not specified, then *yaml* is used
 * optional parameter *a2.mapping.file.url*  must be set to the name of the file that contains key-value store of SQL statements whose text is to be modified by the *Oracle JDBC Forward Driver*. If this parameter is not specified, then *file:///tmp/mapping.yaml* is used
@@ -87,6 +90,7 @@ crp0gbhctd771: set application_name='Swingbench Load Generator'
 ----
 
 To set this mode:
+
 * optional parameter *a2.driver.mode* must have the value *forward*
 * optional parameter *a2.backing.driver* must be set to either *postgres* or *mariadb*. If this parameter is not specified, then *postgres* is used
 * optional parameter *a2.mapping.file.type*  must be set to either *yaml* or *cmap* to read key-value store from either https://yaml.org/[YAML] file or https://chronicle.software/map/[Chronicle Map] respectively. If this parameter is not specified, then *yaml* is used
