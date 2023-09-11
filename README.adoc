@@ -1,0 +1,159 @@
+= Oracle JDBC Forward driver
+
+== Introduction
+*The Oracle JDBC Forward Driver* is designed to preserve existing applications written against the Oracle database through changes to the database, including migrations from the Oracle database to other databases. *Oracle JDBC Forward Driver* operates in three modes
+1. *probe* mode - in this mode, all SQL statements sent to the Oracle server are written to a https://yaml.org/[YAML] file
+2. *proxy* mode - in this mode, the driver changes the text of the SQL statements before sending it to Oracle Database if mapping file contains replacement for that statement
+3. *forward* mode - in this mode, the driver redirects SQL statements to another database and modifies the text of the SQL statements before sending it to the database if the mapping file contains a replacement for that statement.
+When the driver operates in any mode, the end application believes that it is connected to the Oracle database
+
+=== MigDevOps
+To simplify database migration and reduce TCO, we are planning to launch a service in the near future, which will automatically generate a mapping file based on output from driver in *probe* mode containing SQL statements. If you need such a file/automation immediately, then write us an email at oracle@a2-solutions.eu
+
+== How to use Oracle JDBC Forward driver
+Regardless of the *Oracle JDBC Forward Driver* usage mode, you must replace the current https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with *Oracle JDBC Forward Driver*. For example, for an application located under *$APP_TOP_DIR* and using Oracle JDBC in its *lib* directory
+----
+cd $APP_TOP_DIR/lib
+mv ojdbcXXX.jar ojdbcXXX.jar.ORACLE
+cp orajdbc-redirect-XXX-all.jar .
+----
+
+=== probe mode
+When operating in this mode, the *Oracle JDBC Forward Driver* writes all executed commands to a https://yaml.org/[YAML] file. We specifically do not use Oracle Database built-in diagnostics such as https://docs.oracle.com/en/database/oracle/oracle-database/23/tgsql/monitoring-and-tracing-sql.html#GUID-CA494EFF-53D7-4345-9576-8FED65F35AAE[SQL trace, event 10046, etc.] because https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] transforms the source text of SQL statement before sending it to the database server, for example JDBC question mark parameter placeholders are converted to numeric or named binds depending on the version of the Oracle JDBC driver. The resulting file in https://yaml.org/[YAML] is a set of key-value pairs, where the key is the Oracle Database https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/DBMS_SQL_TRANSLATOR.html?source=%3Aem%3Anw%3Amt%3A%3Arc_wwmk180514p00061%3Ansl100768561&source=%3Aem%3Anw%3Amt%3A%3Arc_wwmk180514p00061%3Ansl100768561#GUID-DFFB611B-853A-434E-808D-D713671C3AA4[SQL_ID] and the value is the text of SQL Statement. Below example of this file:
+----
+crp0gbhctd771: {call dbms_application_info.set_client_info('Swingbench Load Generator')}
+4065gwcf6n8ck: select 1 from user_tables where table_name =  'ORDERENTRY_METADATA'
+24x89gg2qg90v: select metadata_key, metadata_value from ORDERENTRY_METADATA
+6ykdvc69dbq6t: select min(warehouse_id), max(warehouse_id) from warehouses
+0t61wk161zz87: select customer_seq.nextval, address_seq.nextval, card_details_seq.nextval from dual
+0rajcffgt2u3s: |-
+  SELECT CUSTOMER_ID, CUST_FIRST_NAME, CUST_LAST_NAME, NLS_LANGUAGE, 
+    NLS_TERRITORY, CREDIT_LIMIT, CUST_EMAIL, ACCOUNT_MGR_ID, CUSTOMER_SINCE, 
+    CUSTOMER_CLASS, SUGGESTIONS, DOB, MAILSHOT, PARTNER_MAILSHOT, 
+    PREFERRED_ADDRESS, PREFERRED_CARD 
+  FROM
+   CUSTOMERS WHERE CUSTOMER_ID = ? AND ROWNUM < 5
+----
+To set this mode:
+* mandatory parameter *a2.driver.mode* must have the value *probe*
+* optional parameter *a2.probe.file*  must be set to the name of the file that can be written to. If this parameter is not specified, then writing will be done to the file */tmp/probe.yaml*
+For example, if the application uses https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with URL
+
+----
+jdbc:oracle:thin:@mydbhost:1521/mydbservice
+----
+
+and we need to record all the commands sent by this application, then we add to the JDBC URL required parameters
+----
+jdbc:oracle:thin:@mydbhost:1521/mydbservice?a2.driver.mode=probe&a2.probe.file=/usr/tmp/collect.yaml
+----
+
+=== proxy mode
+When operating in this mode, the *Oracle JDBC Forward Driver* replaces some SQL statements using data from key-value store (https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ConcurrentHashMap.html[ConcurrentHashMap] and https://yaml.org/[YAML] as persistense layer or https://chronicle.software/map/[Chronicle Map]). When an application executes a SQL statement, the driver computes the https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/DBMS_SQL_TRANSLATOR.html#GUID-DFFB611B-853A-434E-808D-D713671C3AA4[SQL_ID] without roundtrip to the database, and if that SQL_ID is contained in the mapping, it replaces the original SQL text with the SQL text from mapping structure.
+This mode is designed to keep the current application untouched if
+1. The database structure has changed
+2. The data itself has been migrated to another system and you are using https://support.oracle.com/rs?type=doc&id=232482.1[free] https://docs.oracle.com/en/database/oracle/oracle-database/19/odbcu/index.html#Oracle%C2%AE-Database-Gateway-for-ODBC[Oracle TG4ODBC] - for more information about this architecture please see https://docs.google.com/presentation/d/e/2PACX-1vR96Sg9nsAroDjW4LoBZCb5xALsprY8RxhneNNhXG0jqTAaKT5R333uTcd0bPmGuVmqIe5I_L0b0tKD/pub?start=true&loop=true&delayms=3000[Yet another migration approach to mitigate risk and keep current applications intact]
+
+To set this mode:
+* mandatory parameter *a2.driver.mode* must have the value *proxy*
+* optional parameter *a2.mapping.file.type*  must be set to either *yaml* or *cmap* to read key-value store from either https://yaml.org/[YAML] file or https://chronicle.software/map/[Chronicle Map] respectively. If this parameter is not specified, then *yaml* is used
+* optional parameter *a2.mapping.file.url*  must be set to the name of the file that contains key-value store of SQL statements whose text is to be modified by the *Oracle JDBC Forward Driver*. If this parameter is not specified, then *file:///tmp/mapping.yaml* is used
+For example, if the application uses https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with URL
+----
+jdbc:oracle:thin:@mydbhost:1521/mydbservice
+----
+
+and we need to change text of some SQL statements sent by this application, then we add to the JDBC URL required parameters
+----
+jdbc:oracle:thin:@mydbhost:1521/mydbservice?a2.driver.mode=proxy&a2.mapping.file.url=/usr/tmp/mapping.yaml
+----
+
+=== forward mode
+When operating in this mode, the *Oracle JDBC Forward Driver* redirects SQL statements to another database and optionally replaces the SQL statement text sent by application with the text stored in key-value store. This mode is intended for cases when you have migrated data from Oracle Database to another database, but you are still maintaining the current application, which can only work with the Oracle database.  as in **proxy mode** when an application executes a SQL statement, the driver computes the https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/DBMS_SQL_TRANSLATOR.html#GUID-DFFB611B-853A-434E-808D-D713671C3AA4[SQL_ID] without roundtrip to the database, and if that SQL_ID is contained in the mapping, it replaces the original SQL text with the SQL text from key-value store.
+For example, for the SQL specific to Oracle Database listed above in the **probe mode** section you need to create mapping for https://www.postgresql.org/[PostgreSQL]
+----
+crp0gbhctd771: set application_name='Swingbench Load Generator'
+4065gwcf6n8ck: select 1 from information_schema.tables where table_name='orderentry_metadata'
+0t61wk161zz87: select nextval('customer_seq'), nextval('address_seq'), nextval('card_details_seq')
+0rajcffgt2u3s: |-
+  SELECT CUSTOMER_ID, CUST_FIRST_NAME, CUST_LAST_NAME, NLS_LANGUAGE, 
+    NLS_TERRITORY, CREDIT_LIMIT, CUST_EMAIL, ACCOUNT_MGR_ID, CUSTOMER_SINCE, 
+    CUSTOMER_CLASS, SUGGESTIONS, DOB, MAILSHOT, PARTNER_MAILSHOT, 
+    PREFERRED_ADDRESS, PREFERRED_CARD 
+  FROM
+   CUSTOMERS WHERE CUSTOMER_ID = ? LIMIT 5
+----
+
+To set this mode:
+* optional parameter *a2.driver.mode* must have the value *forward*
+* optional parameter *a2.backing.driver* must be set to either *postgres* or *mariadb*. If this parameter is not specified, then *postgres* is used
+* optional parameter *a2.mapping.file.type*  must be set to either *yaml* or *cmap* to read key-value store from either https://yaml.org/[YAML] file or https://chronicle.software/map/[Chronicle Map] respectively. If this parameter is not specified, then *yaml* is used
+* optional parameter *a2.mapping.file.url*  must be set to the name of the file that contains key-value store of SQL statements whose text is to be modified by the *Oracle JDBC Forward Driver*. If this parameter is not specified, then *file:///tmp/mapping.yaml* is used
+For example, if the application uses https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with URL
+----
+jdbc:oracle:thin:@mydbhost:1521/mydbservice
+----
+
+and after migrating the data to PostgreSQL, we need forward all forward all SQL statements to PostgreSQL and change text of some SQL statements, then we add to the JDBC URL required parameters
+----
+jdbc:oracle:thin:@postgresqlhost:5432/postgresdb?a2.driver.mode=forward&a2.mapping.file.url=/usr/tmp/mapping.yaml&a2.backing.driver=postgres
+----
+
+==== Oracle Data Types Mapping
+TBD
+
+==== OracleConnection implementation
+TBD
+
+==== OracleStatement implementation
+TBD
+
+==== OraclePreparedStatement implementation
+TBD
+
+==== OracleCallableStatement implementation
+TBD
+
+==== OracleResultSet implementation
+TBD
+
+
+== Distribution and releases
+TBD
+
+== Building from source
+After you've downloaded the code from GitHub, you can build it using Gradle. Use this command:
+---- 
+gradle clean build
+----
+ 
+The generated jar files can be found at: `build/libs/`.
+
+An uber jar containing the library and all its relocated dependencies except the Oracle JDBC driver can also be built. Use this command: 
+----
+gradle clean shadowJar
+----
+
+The generated uber jar file can also be found at: `build/libs/`. At runtime, the uber jar expects to find the Oracle JDBC driver on the classpath.
+ 
+=== Validating secure dependencies
+To ensure no security vulnerabilities in the dependency libraries, run the following.
+----
+gradle dependencyCheckAnalyze
+----
+
+If the above reports any vulnerabilities, upgrade dependencies to use the respective latest versions.
+
+== Version and release history
+
+=== 0.5.0 (SEP-2023)
+Initial build
+
+
+== Authors
+**Aleksej Veremeev** - *Initial work* - http://a2-solutions.eu/[A2 Rešitve d.o.o.]
+
+== License
+
+This project is licensed under the Apache-2.0 License.
+
