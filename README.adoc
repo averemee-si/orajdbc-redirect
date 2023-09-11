@@ -5,6 +5,7 @@
 1. *probe* mode - in this mode, all SQL statements sent to the Oracle server are written to a https://yaml.org/[YAML] file
 2. *proxy* mode - in this mode, the driver changes the text of the SQL statements before sending it to Oracle Database if mapping file contains replacement for that statement
 3. *forward* mode - in this mode, the driver redirects SQL statements to another database and modifies the text of the SQL statements before sending it to the database if the mapping file contains a replacement for that statement.
+
 When the driver operates in any mode, the end application believes that it is connected to the Oracle database
 
 === MigDevOps
@@ -37,6 +38,7 @@ crp0gbhctd771: {call dbms_application_info.set_client_info('Swingbench Load Gene
 To set this mode:
 * mandatory parameter *a2.driver.mode* must have the value *probe*
 * optional parameter *a2.probe.file*  must be set to the name of the file that can be written to. If this parameter is not specified, then writing will be done to the file */tmp/probe.yaml*
+
 For example, if the application uses https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with URL
 
 ----
@@ -89,6 +91,7 @@ To set this mode:
 * optional parameter *a2.backing.driver* must be set to either *postgres* or *mariadb*. If this parameter is not specified, then *postgres* is used
 * optional parameter *a2.mapping.file.type*  must be set to either *yaml* or *cmap* to read key-value store from either https://yaml.org/[YAML] file or https://chronicle.software/map/[Chronicle Map] respectively. If this parameter is not specified, then *yaml* is used
 * optional parameter *a2.mapping.file.url*  must be set to the name of the file that contains key-value store of SQL statements whose text is to be modified by the *Oracle JDBC Forward Driver*. If this parameter is not specified, then *file:///tmp/mapping.yaml* is used
+
 For example, if the application uses https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html[Oracle JDBC driver] with URL
 ----
 jdbc:oracle:thin:@mydbhost:1521/mydbservice
